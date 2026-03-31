@@ -29,6 +29,7 @@ router.use(requireDbConnection);
 router.post('/', feedbackSubmitLimiter, validateFeedbackInput, createFeedback);
 router.use(authenticate);
 router.get('/', listFeedback);
+/** Must be before /:id or "summary" is captured as an ObjectId and Mongoose throws (500). */
 router.get('/summary', getSummary);
 router.get('/:id', getFeedbackById);
 router.patch('/:id', validateStatusUpdate, updateFeedbackStatus);

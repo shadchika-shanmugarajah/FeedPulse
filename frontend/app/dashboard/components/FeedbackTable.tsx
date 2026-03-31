@@ -6,9 +6,11 @@ interface FeedbackTableProps {
     title: string;
     description?: string;
     category: string;
+    ai_category?: string;
     ai_sentiment?: string;
     ai_priority?: number;
     ai_summary?: string;
+    ai_tags?: string[];
     status: string;
     createdAt?: string;
   }>;
@@ -16,6 +18,7 @@ interface FeedbackTableProps {
   loading: boolean;
   error: string | null;
   onStatusChange: (id: string, nextStatus: string) => void;
+  onDelete: (id: string) => void;
 }
 
 const sentimentStyles: Record<string, string> = {
@@ -38,10 +41,13 @@ function formatDate(iso?: string) {
   }
 }
 
+const gridHeader =
+  'grid min-w-full grid-cols-[minmax(220px,1.6fr)_minmax(120px,0.9fr)_0.75fr_0.5fr_0.75fr_0.85fr_0.65fr] gap-0';
+
 const skeletonRows = Array.from({ length: 5 }).map((_, index) => (
   <div
     key={index}
-    className="grid min-w-full grid-cols-[1.5fr_0.85fr_0.75fr_0.55fr_0.85fr_0.85fr] gap-0 px-4 py-5 text-sm text-slate-200"
+    className={`${gridHeader} px-4 py-5 text-sm text-slate-200`}
   >
     <div className="space-y-3">
       <div className="h-4 w-3/4 rounded-full bg-slate-800/70 animate-pulse" />
@@ -61,18 +67,35 @@ const skeletonRows = Array.from({ length: 5 }).map((_, index) => (
     </div>
     <div className="flex flex-col gap-3">
       <div className="h-4 w-24 rounded-full bg-slate-800/70 animate-pulse" />
-      <div className="h-4 w-16 rounded-full bg-slate-800/70 animate-pulse" />
+    </div>
+    <div className="flex items-center justify-end">
+      <div className="h-8 w-16 rounded-full bg-slate-800/70 animate-pulse" />
     </div>
   </div>
 ));
 
-export default function FeedbackTable({ items, totalCount, loading, error, onStatusChange }: FeedbackTableProps) {
+export default function FeedbackTable({
+  items,
+  totalCount,
+  loading,
+  error,
+  onStatusChange,
+  onDelete,
+}: FeedbackTableProps) {
+  const confirmDelete = (id: string, title: string) => {
+    if (typeof window !== 'undefined' && window.confirm(`Delete “${title}”? This cannot be undone.`)) {
+      onDelete(id);
+    }
+  };
+
   return (
     <div className="rounded-[32px] border border-slate-800 bg-slate-900/90 p-6 shadow-xl shadow-slate-950/20">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">Feedback list</h2>
-          <p className="mt-1 text-sm text-slate-400">AI-enriched items with sentiment and priority at a glance.</p>
+          <p className="mt-1 text-sm text-slate-400">
+            User category vs AI classification, sentiment, priority, tags, and workflow.
+          </p>
         </div>
         <span className="inline-flex rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-300">
           {items.length} on this page · {totalCount} total
@@ -88,29 +111,46 @@ export default function FeedbackTable({ items, totalCount, loading, error, onSta
       ) : null}
 
       <div className="mt-6 overflow-x-auto rounded-[28px] border border-slate-800 bg-slate-950">
-        <div className="min-w-[900px]">
-          <div className="grid min-w-full grid-cols-[1.5fr_0.85fr_0.75fr_0.55fr_0.85fr_0.85fr] gap-0 border-b border-slate-800 bg-slate-900/95 px-4 py-4 text-left text-sm font-semibold uppercase tracking-[0.15em] text-slate-500">
-            <span>Title</span>
-            <span>Category</span>
+        <div className="min-w-[1024px]">
+          <div
+            className={`${gridHeader} border-b border-slate-800 bg-slate-900/95 px-4 py-4 text-left text-sm font-semibold uppercase tracking-[0.15em] text-slate-500`}
+          >
+            <span>Title · AI</span>
+            <span>Categories</span>
             <span>Sentiment</span>
             <span>Priority</span>
             <span>Date</span>
             <span>Status</span>
+            <span className="text-right">Actions</span>
           </div>
           <div className="divide-y divide-slate-800 bg-slate-950">
             {loading && !items.length ? (
               skeletonRows
             ) : (
               items.map((item) => (
-                <div
-                  key={item._id}
-                  className="grid min-w-full grid-cols-[1.5fr_0.85fr_0.75fr_0.55fr_0.85fr_0.85fr] gap-0 px-4 py-5 text-sm text-slate-200"
-                >
-                  <div className="space-y-1">
+                <div key={item._id} className={`${gridHeader} px-4 py-5 text-sm text-slate-200`}>
+                  <div className="space-y-2">
                     <p className="font-semibold text-white">{item.title}</p>
-                    <p className="text-slate-400">{item.ai_summary || item.description}</p>
+                    <p className="line-clamp-2 text-slate-400">{item.ai_summary || item.description}</p>
+                    {item.ai_tags && item.ai_tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {item.ai_tags.slice(0, 6).map((tag, tagIndex) => (
+                          <span
+                            key={`${item._id}-tag-${tagIndex}`}
+                            className="rounded-full bg-slate-800/90 px-2 py-0.5 text-[11px] font-medium text-cyan-200/90"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="text-slate-300">{item.category}</div>
+                  <div className="text-slate-300">
+                    <p className="text-xs text-slate-500">User</p>
+                    <p>{item.category}</p>
+                    <p className="mt-2 text-xs text-slate-500">AI</p>
+                    <p>{item.ai_category || '—'}</p>
+                  </div>
                   <div>
                     <span
                       className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${sentimentStyles[item.ai_sentiment || ''] || sentimentStyles.Neutral}`}
@@ -137,6 +177,15 @@ export default function FeedbackTable({ items, totalCount, loading, error, onSta
                         Advance
                       </button>
                     ) : null}
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      className="rounded-2xl border border-rose-500/40 px-3 py-1.5 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/10"
+                      onClick={() => confirmDelete(item._id, item.title)}
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))

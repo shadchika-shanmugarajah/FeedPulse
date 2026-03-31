@@ -57,3 +57,26 @@ export const updateFeedbackStatus = async (token: string, id: string, status: st
     return networkError;
   }
 };
+
+export const deleteFeedback = async (token: string, id: string) => {
+  try {
+    const response = await fetch(`${API_URL}/api/feedback/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return safeJson(response);
+  } catch {
+    return networkError;
+  }
+};
+
+export const fetchFeedbackSummary = async (token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/api/feedback/summary`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return safeJson(response);
+  } catch {
+    return networkError;
+  }
+};

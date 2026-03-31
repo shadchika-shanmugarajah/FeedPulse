@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { fetchFeedback, updateFeedbackStatus } from '@/lib/api';
+import { deleteFeedback, fetchFeedback, fetchFeedbackSummary, updateFeedbackStatus } from '@/lib/api';
 import FeedbackTable from '@/app/dashboard/components/FeedbackTable';
 import StatsBar from '@/app/dashboard/components/StatsBar';
 
@@ -33,23 +33,55 @@ export default function DashboardPage() {
     avgPriority: 0,
     topTag: null as string | null,
   });
+  const [token, setToken] = useState<string | null | undefined>(undefined);
+  const [digest, setDigest] = useState<{
+    total: number;
+    openItems: number;
+    averagePriority: number;
+    summary: string;
+  } | null>(null);
+  const [digestLoading, setDigestLoading] = useState(false);
   const router = useRouter();
 
-  const token = useMemo(() => (typeof window !== 'undefined' ? localStorage.getItem('feedpulse_token') : null), []);
+  useEffect(() => {
+    setToken(localStorage.getItem('feedpulse_token'));
+  }, []);
 
   useEffect(() => {
+    if (token === undefined) return;
     if (!token) {
       router.replace('/dashboard/login');
     }
   }, [router, token]);
 
   useEffect(() => {
-    if (token) {
-      loadFeedback();
-    }
+    if (!token) return;
+    loadFeedback();
   }, [token, category, status, search, sort, page]);
 
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      setDigestLoading(true);
+      const res = await fetchFeedbackSummary(token);
+      if (!cancelled && res.success && res.data) {
+        setDigest({
+          total: res.data.total ?? 0,
+          openItems: res.data.openItems ?? 0,
+          averagePriority: res.data.averagePriority ?? 0,
+          summary: res.data.summary ?? '',
+        });
+      }
+      if (!cancelled) setDigestLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
   const loadFeedback = async () => {
+    if (!token) return;
     setLoading(true);
     setError(null);
     try {
@@ -57,7 +89,7 @@ export default function DashboardPage() {
       if (category !== 'All') filterParams.category = category;
       if (status !== 'All') filterParams.status = status;
       if (search) filterParams.search = search;
-      const response = await fetchFeedback(token || '', filterParams);
+      const response = await fetchFeedback(token, filterParams);
       if (!response.success) {
         throw new Error(response.message || 'Failed to load feedback');
       }
@@ -95,10 +127,28 @@ export default function DashboardPage() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!token) return;
+    const response = await deleteFeedback(token, id);
+    if (response.success) {
+      loadFeedback();
+    } else {
+      setError(response.message || 'Unable to delete feedback');
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('feedpulse_token');
     router.push('/dashboard/login');
   };
+
+  if (token === undefined) {
+    return (
+      <main className="min-h-screen bg-slate-950 px-4 py-10 sm:px-6 lg:px-8">
+        <p className="mx-auto max-w-7xl text-center text-slate-400">Loading…</p>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-10 sm:px-6 lg:px-8">
@@ -119,6 +169,32 @@ export default function DashboardPage() {
             </button>
           </div>
         </section>
+
+        {digest || digestLoading ? (
+          <section className="rounded-[32px] border border-cyan-500/20 bg-slate-900/80 p-8 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.8)]">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-[0.35em] text-cyan-300">AI digest</p>
+                <h2 className="mt-2 text-xl font-semibold text-white">Weekly-style summary</h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Generated from all feedback in the system (refreshes when you open the dashboard).
+                </p>
+              </div>
+              {digest ? (
+                <div className="text-right text-sm text-slate-500">
+                  <p>
+                    {digest.openItems} open · {digest.total} total · avg priority {digest.averagePriority}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+            {digestLoading ? (
+              <p className="mt-6 text-slate-400">Generating summary…</p>
+            ) : digest ? (
+              <p className="mt-6 whitespace-pre-wrap text-slate-200 leading-relaxed">{digest.summary}</p>
+            ) : null}
+          </section>
+        ) : null}
 
         <section className="grid gap-6 xl:grid-cols-[320px_1fr]">
           <aside className="space-y-6 rounded-[32px] border border-slate-800 bg-slate-900/90 p-6 shadow-xl shadow-slate-950/20">
@@ -197,6 +273,7 @@ export default function DashboardPage() {
               loading={loading}
               error={error}
               onStatusChange={handleStatusChange}
+              onDelete={handleDelete}
             />
             <div className="flex flex-col gap-4 rounded-[32px] border border-slate-800 bg-slate-900/90 p-5 text-slate-300 sm:flex-row sm:items-center sm:justify-between">
               <span>Page {meta.page} of {meta.pages}</span>

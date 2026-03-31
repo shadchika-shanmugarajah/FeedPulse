@@ -1,8 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
-
 export const authenticate = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -10,9 +8,10 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
   }
 
   const token = authHeader.split(' ')[1];
+  const jwtSecret = process.env.JWT_SECRET || 'fallback_secret';
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, jwtSecret);
     (req as Request & { user?: unknown }).user = decoded;
     next();
   } catch {

@@ -1,141 +1,121 @@
 # FeedPulse — AI-Powered Product Feedback Platform
 
-FeedPulse is a full-stack feedback application built with Next.js, Tailwind CSS, Express, MongoDB, and Google Gemini AI. The platform allows customers to submit product feedback while the backend enriches entries with AI-generated category, sentiment, priority, summary, and tags.
+FeedPulse is a full-stack feedback application built with Next.js, Tailwind CSS, Express, MongoDB, and Google Gemini AI. Customers submit product feedback without logging in; the backend enriches each entry with AI-generated category, sentiment, priority score, summary, and tags. Admins sign in to review items, filter, advance status, and delete entries.
 
 ## Tech Stack
 
-- Frontend: Next.js 14 (App Router), TypeScript, Tailwind CSS
-- Backend: Node.js, Express, TypeScript
-- Database: MongoDB, Mongoose
-- AI: Google Gemini API (`gemini-1.5-flash`)
-- DevOps: Docker, Docker Compose
+- **Frontend:** Next.js 14 (App Router), TypeScript, Tailwind CSS
+- **Backend:** Node.js, Express, TypeScript
+- **Database:** MongoDB (Mongoose)
+- **AI:** Google Gemini API (default model: `gemini-2.5-flash`, configurable via `GEMINI_MODEL`)
+- **DevOps:** Docker, Docker Compose (optional)
 
 ## Project Structure
 
-- `frontend/` — Next.js application
-- `backend/` — Express API server
-- `docker-compose.yml` — Local container composition
-- `README.md` — Project documentation
+- `frontend/` — Next.js public form + admin dashboard
+- `backend/` — Express REST API
+- `docker-compose.yml` — Local MongoDB + API + frontend (optional)
 
 ## Features
 
-- Submit feedback using a public form
-- AI enrichment on each new feedback entry
-- Admin dashboard with authentication
-- Filtering, search, sorting, pagination
-- Sentiment badges and priority scoring
-- Rate limiting (5 requests/hour per IP)
-- Docker-ready frontend and backend
+- Public feedback form (title, description, category; optional name/email)
+- Gemini analysis: `ai_category`, sentiment, priority (1–10), summary, tags
+- Admin JWT login, list with pagination, search, filters, sorting
+- Stats bar (totals, open count, average priority, top tag)
+- Optional **AI digest** on the dashboard (aggregate summary via Gemini)
+- Rate limiting on public submissions (5 per IP per hour)
+- Delete feedback (admin)
 
 ## Setup
 
+### Prerequisites
+
+- Node.js 18+
+- MongoDB (local or [MongoDB Atlas](https://www.mongodb.com/cloud/atlas))
+- A [Google AI Studio](https://aistudio.google.com/apikey) Gemini API key
+
 ### Backend
 
-1. Navigate to the backend folder:
-   ```bash
-   cd backend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Copy environment example:
-   ```bash
-   cp .env.example .env
-   ```
-4. Update `.env` with your values. For MongoDB Atlas, use a connection string like:
-   ```bash
-   MONGO_URI=mongodb+srv://admin:FeedPulse123!@cluster0.yreynss.mongodb.net/?appName=Cluster0?retryWrites=true&w=majority
-   ```
+1. `cd backend`
+2. `npm install`
+3. Copy `cp .env.example .env` and set:
+   - `MONGO_URI` — e.g. `mongodb://127.0.0.1:27017/feedpulse` or Atlas:
+     `mongodb+srv://USER:PASSWORD@cluster.mongodb.net/feedpulse?retryWrites=true&w=majority`
    - `GEMINI_API_KEY`
-   - `JWT_SECRET`
-   - `ADMIN_EMAIL`
-   - `ADMIN_PASSWORD`
-5. Start the backend server:
-   ```bash
-   npm run dev
-   ```
+   - `JWT_SECRET` (long random string)
+   - `ADMIN_EMAIL` / `ADMIN_PASSWORD` (dashboard login)
+4. `npm run dev` — API listens on port **4000** by default (`PORT` in `.env`).
 
 ### Frontend
 
-1. Navigate to the frontend folder:
-   ```bash
-   cd frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Copy environment example:
-   ```bash
-   cp .env.example .env.local
-   ```
-4. Start the frontend:
-   ```bash
-   npm run dev
-   ```
+1. `cd frontend`
+2. `npm install`
+3. `cp .env.example .env.local`
+4. Set `NEXT_PUBLIC_API_URL=http://localhost:4000` (or your deployed API URL).
+5. `npm run dev` — app at **http://localhost:3000**
 
-## Running Locally with Docker
+### Docker
 
-1. Copy root environment values into `.env` at the project root.
-2. Start containers:
-   ```bash
-   docker compose up --build
-   ```
-3. Visit:
-   - Frontend: `http://localhost:3000`
-   - Backend API: `http://localhost:4000`
+1. Copy root `.env.example` to `.env` and fill values.
+2. `docker compose up --build`
+3. Frontend: `http://localhost:3000` · API: `http://localhost:4000`
 
 ## API Endpoints
 
-- `POST /api/feedback` — Create feedback
-- `GET /api/feedback` — List feedback with filters and pagination
-- `GET /api/feedback/:id` — Get a single feedback item
-- `PATCH /api/feedback/:id` — Update feedback status
-- `DELETE /api/feedback/:id` — Delete feedback
-- `GET /api/feedback/summary` — AI-powered feedback summary
-- `POST /api/auth/login` — Admin login
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/feedback` | No | Create feedback (AI runs on create) |
+| `GET` | `/api/feedback` | Yes | List with `category`, `status`, `search`, `page`, `limit`, `sort` |
+| `GET` | `/api/feedback/summary` | Yes | Aggregate stats + AI digest text |
+| `GET` | `/api/feedback/:id` | Yes | Single feedback |
+| `PATCH` | `/api/feedback/:id` | Yes | Update `status` (`New` \| `In Review` \| `Resolved`) |
+| `DELETE` | `/api/feedback/:id` | Yes | Delete feedback |
+| `POST` | `/api/auth/login` | No | Admin login → JWT |
+| `GET` | `/api/health` | No | Health check |
 
 ## Admin Dashboard
 
-- Login at `/dashboard/login`
-- View feedback list and stats
-- Filter by category and status
-- Search title and summary
-- Advance feedback status
-- Use token-based auth for protected routes
+- Login: `/dashboard/login`
+- After login: `/dashboard` — filters, search, stats, AI digest, status workflow, delete
 
 ## Environment Variables
 
-### Backend
+### Backend (`backend/.env`)
 
-- `MONGO_URI` — MongoDB Atlas should use an SRV string such as:
-  `mongodb+srv://<username>:<password>@<cluster>.mongodb.net/feedpulse?retryWrites=true&w=majority`
-- `GEMINI_API_KEY`
-- `JWT_SECRET`
-- `ADMIN_EMAIL`
-- `ADMIN_PASSWORD`
+| Variable | Description |
+|----------|-------------|
+| `MONGO_URI` | MongoDB connection string |
+| `GEMINI_API_KEY` | Google Gemini API key |
+| `GEMINI_MODEL` | Optional; default `gemini-2.5-flash` |
+| `JWT_SECRET` | Secret for signing admin JWTs |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Dashboard credentials |
+| `PORT` | API port (default `4000`) |
 
-### Frontend
+### Frontend (`frontend/.env.local`)
 
-- `NEXT_PUBLIC_API_URL`
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_API_URL` | Base URL of the API (e.g. `http://localhost:4000`) |
 
 ## Testing
 
-### Backend
-
-Run Jest test:
 ```bash
 cd backend
 npm test
 ```
 
+Runs Jest unit tests (including a smoke test for `/api/health`).
+
 ## Screenshots
 
-- `📸 Screenshot: Public feedback form`
-- `📸 Screenshot: Admin dashboard with stats`
-- `📸 Screenshot: AI-enriched feedback list`
+Add your own screenshots to the repo or docs when you ship:
+
+1. **Public form** — Home page with feedback submission.
+2. **Admin dashboard** — Filters, stats, and AI-enriched list.
+3. **AI insights** — Example row showing sentiment, priority, summary, tags.
+
+*(Replace this section with real images, e.g. `docs/screenshots/form.png`, linked in markdown.)*
 
 ---
 
-Built with a focus on modular TypeScript architecture, reusable UI components, and secure admin workflows.
+Built with a modular TypeScript layout (routes, controllers, models, services) and clear separation between public submission and protected admin APIs.
